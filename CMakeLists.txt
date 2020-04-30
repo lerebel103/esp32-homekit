@@ -8,7 +8,7 @@ set(COMPONENT_REQUIRES
         lwip
         json
         wpa_supplicant
-        esp32-wolfssl
+        esp-wolfssl
         esp_http_server
         )
 
