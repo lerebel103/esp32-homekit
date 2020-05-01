@@ -250,6 +250,16 @@ static esp_err_t _pair_setup_post(httpd_req_t *req) {
     return ret;
 }
 
+static void _disconnect_handler(void *arg, esp_event_base_t event_base,
+                                int32_t event_id, void *event_data) {
+    UNUSED_ARG(arg);
+    UNUSED_ARG(event_base);
+    UNUSED_ARG(event_id);
+    UNUSED_ARG(event_data);
+
+    httpd_encrypted_stop(s_server);
+}
+
 static void _connect_handler(void *arg, esp_event_base_t event_base,
                              int32_t event_id, void *event_data) {
     UNUSED_ARG(arg);
@@ -258,9 +268,9 @@ static void _connect_handler(void *arg, esp_event_base_t event_base,
     UNUSED_ARG(event_data);
 
     if (s_server != NULL) {
-        ESP_LOGI(TAG, "HTTP server already initialised.");
-        // not yet initialised.
-        return;
+        ESP_LOGI(TAG, "HTTP server already initialised, restarting");
+        _disconnect_handler(arg, event_base, event_id, event_data);
+        s_server = NULL;
     }
 
     esp_err_t ret = httpd_encrypted_start(&s_server);
@@ -317,17 +327,7 @@ static void _connect_handler(void *arg, esp_event_base_t event_base,
     }
 }
 
-static void _disconnect_handler(void *arg, esp_event_base_t event_base,
-                                int32_t event_id, void *event_data) {
-    UNUSED_ARG(arg);
-    UNUSED_ARG(event_base);
-    UNUSED_ARG(event_id);
-    UNUSED_ARG(event_data);
-
-    httpd_encrypted_stop(s_server);
-}
-
-static void _accessory_ltk_load(struct hap_accessory* a) 
+static void _accessory_ltk_load(struct hap_accessory* a)
 {
     char acc_id_compact[13] = {0,};
     acc_id_compact[0] = a->id[0];
