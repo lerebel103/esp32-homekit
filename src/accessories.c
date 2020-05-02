@@ -342,13 +342,13 @@ int hap_acc_characteristic_put(struct hap_accessory* a, char* req_body, int req_
             continue;
 
         cJSON* ev_json = cJSON_GetObjectItem(char_json, "ev");
-        if (ev_json && c->event) {
-            if (ev_json->valueint) {
-                c->event(c->callback_arg, (void*)c, (bool)ev_json->valueint);
-            }
-            else {
-                c->event(c->callback_arg, (void*)c, (bool)ev_json->valueint);
-            }
+        /*if (ev_json && c->event) {
+            c->event(c->callback_arg, (void*)c, (bool)ev_json->valueint);
+        } else if (c->event) {
+            c->event(c->callback_arg, (void*)c, false);
+        }*/
+        if (c->event) {
+            c->event(c->callback_arg, (void *) c, true);
         }
 
         cJSON* value_json = cJSON_GetObjectItem(char_json, "value");
