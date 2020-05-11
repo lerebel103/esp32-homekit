@@ -512,7 +512,7 @@ void httpd_encrypted_init(int port) {
     s_config.recv_wait_timeout = 5;
     s_config.send_wait_timeout = 5;
     s_config.lru_purge_enable = true;
-    s_config.stack_size = 1024 * 8;
+    s_config.stack_size = 1024 * 7;
     s_config.open_fn = _connection_opened;
     s_config.close_fn = _connection_closed;
 
