@@ -112,9 +112,11 @@ bool advertise_init(char* host, char* vendor) {
                 ok = true;
             } else {
                 ESP_LOGE(TAG, "Could not set MDNS instance name");
+                mdns_free();
             }
         } else {
             ESP_LOGE(TAG, "Could not set MDNS host name");
+            mdns_free();
         }
     } else {
         ESP_LOGE(TAG, "Could not initialise MDNS");

@@ -26,6 +26,7 @@
 static bool s_registered = false;
 static httpd_handle_t s_server = NULL;
 static struct hap_accessory* s_accessory = NULL;
+static bool s_mdns_up = false;
 
 
 static esp_err_t _accessories_get(httpd_req_t *req) {
@@ -322,10 +323,15 @@ static void _connect_handler(void *arg, esp_event_base_t event_base,
                 .user_ctx  = NULL
         });
 
-        // Start mdns
-        advertise_terminate();
-        if (s_accessory && advertise_init(s_accessory->name, s_accessory->vendor)) {
-            advertise_accessory_state(s_accessory->advertise);
+        // Re-advertise MDNS...
+        if (s_accessory) {
+            if (!s_mdns_up) {
+                s_mdns_up = advertise_init(s_accessory->name, s_accessory->vendor);
+            }
+
+            if (s_mdns_up) {
+                advertise_accessory_state(s_accessory->advertise);
+            }
         }
     } else {
         ESP_LOGE(TAG, "Error starting server!");
