@@ -22,7 +22,6 @@ struct advertiser {
     char service_txt_c_sharp[SERVICE_TXT_LEN];
     char service_txt_sf[SERVICE_TXT_LEN];
     char service_txt_ci[SERVICE_TXT_LEN];
-    //mdns_server_t* mdns;
 };
 
 static void _service_txt_set(struct advertiser* adv) {
@@ -46,6 +45,8 @@ static void _service_txt_set(struct advertiser* adv) {
         {"ci", adv->service_txt_ci},
     };
 
+    // attempt to add service regardless
+    mdns_service_add(adv->name, HAP_SERVICE, HAP_PROTO, adv->port, NULL, 0);
     mdns_service_txt_set(HAP_SERVICE, HAP_PROTO, hap_service_txt, ARRAY_SIZE(hap_service_txt));
     ESP_LOGD(TAG, "MDNS updated");
 }
@@ -78,11 +79,10 @@ void advertise_accessory_state_set(void* adv_instance, enum advertise_accessory_
     _service_txt_set(adv);
 }
 
-void* advertise_accessory_add(char* name, char* id, char* host, int port, uint32_t config_number,
-                              enum hap_accessory_category category, enum advertise_accessory_state state)
-{
+void* advertise_accessory_create(char *name, char *id, int port, uint32_t config_number,
+                                 enum hap_accessory_category category, enum advertise_accessory_state state) {
 
-    if (name == NULL || id == NULL || host == NULL) {
+    if (name == NULL || id == NULL) {
         printf("[ERR] Invalid arg\n");
         return NULL;
     }
@@ -100,13 +100,31 @@ void* advertise_accessory_add(char* name, char* id, char* host, int port, uint32
     adv->category = category;
     adv->state = state;
 
-    mdns_init();
-    mdns_hostname_set(host);
-    mdns_instance_name_set(name);
-    mdns_service_add(name, HAP_SERVICE, HAP_PROTO, port, NULL, 0);
-    _service_txt_set(adv);
-
     return adv;
+}
+
+bool advertise_init(char* host, char* vendor) {
+    bool ok = false;
+
+    if (mdns_init() == ESP_OK) {
+        if (mdns_hostname_set(host) == ESP_OK) {
+            if (mdns_instance_name_set(vendor) == ESP_OK) {
+                ok = true;
+            } else {
+                ESP_LOGE(TAG, "Could not set MDNS instance name");
+            }
+        } else {
+            ESP_LOGE(TAG, "Could not set MDNS host name");
+        }
+    } else {
+        ESP_LOGE(TAG, "Could not initialise MDNS");
+    }
+
+    return ok;
+}
+
+void advertise_terminate() {
+    mdns_free();
 }
 
 void advertise_accessory_remove(void* adv_instance) {

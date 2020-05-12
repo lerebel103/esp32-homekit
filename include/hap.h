@@ -229,8 +229,6 @@ void* hap_accessory_register(char* name, char* id, char* pincode, char* vendor, 
                          uint32_t config_number, void* callback_arg, hap_accessory_callback_t* callback);
 
 
-void hap_advertise(void* handle);
-
 void hap_init(int port);
 void hap_terminate();
 

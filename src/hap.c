@@ -322,6 +322,11 @@ static void _connect_handler(void *arg, esp_event_base_t event_base,
                 .user_ctx  = NULL
         });
 
+        // Start mdns
+        advertise_terminate();
+        if (s_accessory && advertise_init(s_accessory->name, s_accessory->vendor)) {
+            advertise_accessory_state(s_accessory->advertise);
+        }
     } else {
         ESP_LOGE(TAG, "Error starting server!");
     }
@@ -421,9 +426,10 @@ void* hap_accessory_register(char* name, char* id, char* pincode, char* vendor, 
 
     _accessory_ltk_load(accessory);
     accessory->iosdevices = iosdevice_pairings_init(accessory->id);
-    accessory->advertise = advertise_accessory_add(accessory->name, accessory->id,
-            accessory->vendor, httpd_encrypted_get_port(), accessory->config_number, accessory->category,
-            ADVERTISE_ACCESSORY_STATE_NOT_PAIRED);
+    accessory->advertise = advertise_accessory_create(accessory->name, accessory->id,
+                                                      httpd_encrypted_get_port(), accessory->config_number,
+                                                      accessory->category,
+                                                      ADVERTISE_ACCESSORY_STATE_NOT_PAIRED);
 
     s_accessory = accessory;
 
@@ -441,11 +447,6 @@ void hap_accessory_remove(void* acc_instance) {
     free(a->name);
     free(a->vendor);
     free(a);
-}
-
-void hap_advertise(void* handle){
-    struct hap_accessory* acc = handle;
-    advertise_accessory_state(acc->advertise);
 }
 
 void hap_init(int port) {

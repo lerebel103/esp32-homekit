@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <esp_log.h>
 
 #include "chacha20_poly1305.h"
 #include "concat.h"
@@ -14,42 +15,39 @@
 #include "tlv.h"
 
 struct pair_verify {
-    char* acc_id;
-    void* iosdevices;
-    
+    char *acc_id;
+    void *iosdevices;
+
     struct {
-        uint8_t* public;
-        uint8_t* private;
+        uint8_t *public;
+        uint8_t *private;
     } keys;
     uint8_t session_key[CURVE25519_SECRET_LENGTH];
 };
 
 
-static void _subtlv_free(uint8_t* subtlv)
-{
+static void _subtlv_free(uint8_t *subtlv) {
     if (subtlv)
         free(subtlv);
 }
 
-static uint8_t _state_get(uint8_t* device_msg, int device_msg_length)
-{
-    struct tlv* state_tlv = tlv_decode((uint8_t*)device_msg, device_msg_length, 
-            HAP_TLV_TYPE_STATE);
+static uint8_t _state_get(uint8_t *device_msg, int device_msg_length) {
+    struct tlv *state_tlv = tlv_decode((uint8_t *) device_msg, device_msg_length,
+                                       HAP_TLV_TYPE_STATE);
     if (state_tlv == NULL) {
         printf("tlv_decode failed. type:%d\n", HAP_TLV_TYPE_STATE);
         return 0;
     }
 
-    uint8_t state = ((uint8_t*)&state_tlv->value)[0];
+    uint8_t state = ((uint8_t *) &state_tlv->value)[0];
 
     tlv_decoded_item_free(state_tlv);
     return state;
 }
 
-static int _verify_m2(struct pair_verify* pv, 
-        uint8_t* device_msg, int device_msg_length, 
-        uint8_t** acc_msg, int* acc_msg_length)
-{
+static int _verify_m2(struct pair_verify *pv,
+                      uint8_t *device_msg, int device_msg_length,
+                      uint8_t **acc_msg, int *acc_msg_length) {
     uint8_t acc_curve_public_key[CURVE25519_KEY_LENGTH] = {0,};
     uint8_t acc_curve_private_key[CURVE25519_KEY_LENGTH] = {0,};
     if (curve25519_key_generate(acc_curve_public_key, acc_curve_private_key) < 0) {
@@ -57,8 +55,8 @@ static int _verify_m2(struct pair_verify* pv,
         return -1;
     }
 
-    struct tlv* ios_device_curve_key = tlv_decode((uint8_t*)device_msg, 
-            device_msg_length, HAP_TLV_TYPE_PUBLICKEY);
+    struct tlv *ios_device_curve_key = tlv_decode((uint8_t *) device_msg,
+                                                  device_msg_length, HAP_TLV_TYPE_PUBLICKEY);
     if (!ios_device_curve_key) {
         printf("tlv_decode failed. type:%d\n", HAP_TLV_TYPE_PUBLICKEY);
         return -1;
@@ -66,43 +64,45 @@ static int _verify_m2(struct pair_verify* pv,
 
     uint8_t session_key[CURVE25519_SECRET_LENGTH] = {0,};
     int session_key_length = CURVE25519_SECRET_LENGTH;
-    if (curve25519_shared_secret((uint8_t*)&ios_device_curve_key->value,
-            acc_curve_private_key, session_key, &session_key_length) < 0) {
+    if (curve25519_shared_secret((uint8_t *) &ios_device_curve_key->value,
+                                 acc_curve_private_key, session_key, &session_key_length) < 0) {
         printf("curve25519_shared_secret failed\n");
         return -1;
     }
 
     int acc_info_len;
     uint8_t* acc_info = concat3(acc_curve_public_key, CURVE25519_KEY_LENGTH,
-            (uint8_t*)pv->acc_id, strlen(pv->acc_id),
-            (uint8_t*)&ios_device_curve_key->value, ios_device_curve_key->length,
-            &acc_info_len);
+                                (uint8_t*)pv->acc_id, strlen(pv->acc_id),
+                                (uint8_t*)&ios_device_curve_key->value, ios_device_curve_key->length,
+                                &acc_info_len);
 
     tlv_decoded_item_free(ios_device_curve_key);
 
     int acc_signature_length = ED25519_SIGN_LENGTH;
     uint8_t acc_signature[ED25519_SIGN_LENGTH] = {0,};
-    ed25519_sign(pv->keys.public, pv->keys.private, 
-            acc_info, acc_info_len,
-            acc_signature, &acc_signature_length);
+    ed25519_sign(pv->keys.public, pv->keys.private,
+                 (uint8_t *) acc_info, acc_info_len,
+                 acc_signature, &acc_signature_length);
 
-    concat_free(acc_info);
+    free(acc_info);
 
     int acc_plain_subtlv_length = tlv_encode_length(strlen(pv->acc_id));
     acc_plain_subtlv_length += tlv_encode_length(acc_signature_length);
 
-    uint8_t* acc_plain_subtlv = malloc(acc_plain_subtlv_length);
-    uint8_t* sub_tlv_write_ptr = acc_plain_subtlv;
+    uint8_t *acc_plain_subtlv = malloc(acc_plain_subtlv_length);
+    uint8_t *sub_tlv_write_ptr = acc_plain_subtlv;
 
-    sub_tlv_write_ptr += tlv_encode(HAP_TLV_TYPE_IDENTIFIER, strlen(pv->acc_id), (uint8_t*)pv->acc_id, sub_tlv_write_ptr);
-    sub_tlv_write_ptr += tlv_encode(HAP_TLV_TYPE_SIGNATURE, ED25519_SIGN_LENGTH, acc_signature, sub_tlv_write_ptr);
+    sub_tlv_write_ptr += tlv_encode(HAP_TLV_TYPE_IDENTIFIER, strlen(pv->acc_id), (uint8_t *) pv->acc_id,
+                                    sub_tlv_write_ptr);
+    tlv_encode(HAP_TLV_TYPE_SIGNATURE, ED25519_SIGN_LENGTH, acc_signature, sub_tlv_write_ptr);
 
     int acc_subtlv_length = acc_plain_subtlv_length + CHACHA20_POLY1305_AUTH_TAG_LENGTH;
-    uint8_t* acc_subtlv = (uint8_t*)calloc(1, acc_subtlv_length);
+    uint8_t *acc_subtlv = (uint8_t *) calloc(1, acc_subtlv_length);
 
     uint8_t subtlv_key[HKDF_KEY_LEN] = {0,};
     hkdf_key_get(HKDF_KEY_TYPE_PAIR_VERIFY_ENCRYPT, session_key, CURVE25519_SECRET_LENGTH, subtlv_key);
-    chacha20_poly1305_encrypt(CHACHA20_POLY1305_TYPE_PV02, subtlv_key, NULL, 0, acc_plain_subtlv, acc_plain_subtlv_length, acc_subtlv);
+    chacha20_poly1305_encrypt(CHACHA20_POLY1305_TYPE_PV02, subtlv_key, NULL, 0, acc_plain_subtlv,
+                              acc_plain_subtlv_length, acc_subtlv);
 
     free(acc_plain_subtlv);
 
@@ -117,7 +117,7 @@ static int _verify_m2(struct pair_verify* pv,
         return pair_error(HAP_TLV_ERROR_UNKNOWN, acc_msg, acc_msg_length);
     }
 
-    uint8_t* tlv_encode_ptr = *acc_msg;
+    uint8_t *tlv_encode_ptr = *acc_msg;
     tlv_encode_ptr += tlv_encode(HAP_TLV_TYPE_STATE, sizeof(state), state, tlv_encode_ptr);
     tlv_encode_ptr += tlv_encode(HAP_TLV_TYPE_PUBLICKEY, CURVE25519_KEY_LENGTH, acc_curve_public_key, tlv_encode_ptr);
     tlv_encode(HAP_TLV_TYPE_ENCRYPTED_DATA, acc_subtlv_length, acc_subtlv, tlv_encode_ptr);
@@ -125,16 +125,15 @@ static int _verify_m2(struct pair_verify* pv,
     _subtlv_free(acc_subtlv);
 
     memcpy(pv->session_key, session_key, CURVE25519_SECRET_LENGTH);
-    
+
     return 0;
 }
 
-static int _verify_m4(struct pair_verify* pv, 
-        uint8_t* device_msg, int device_msg_length, 
-        uint8_t** acc_msg, int* acc_msg_length)
-{
-    struct tlv* encrypted_tlv = tlv_decode((uint8_t*)device_msg, device_msg_length,
-            HAP_TLV_TYPE_ENCRYPTED_DATA);
+static int _verify_m4(struct pair_verify *pv,
+                      uint8_t *device_msg, int device_msg_length,
+                      uint8_t **acc_msg, int *acc_msg_length) {
+    struct tlv *encrypted_tlv = tlv_decode((uint8_t *) device_msg, device_msg_length,
+                                           HAP_TLV_TYPE_ENCRYPTED_DATA);
     if (encrypted_tlv == NULL) {
         printf("tlv_decode HAP_TLV_TYPE_ENCRYPTED_DATA failed\n");
         return pair_error(HAP_TLV_ERROR_UNKNOWN, acc_msg, acc_msg_length);
@@ -142,22 +141,23 @@ static int _verify_m4(struct pair_verify* pv,
 
     uint8_t subtlv_key[HKDF_KEY_LEN] = {0,};
     hkdf_key_get(HKDF_KEY_TYPE_PAIR_VERIFY_ENCRYPT, pv->session_key, CURVE25519_SECRET_LENGTH, subtlv_key);
-    uint8_t* subtlv = malloc(encrypted_tlv->length);
-    chacha20_poly1305_decrypt(CHACHA20_POLY1305_TYPE_PV03, subtlv_key, NULL, 0, (uint8_t*)&encrypted_tlv->value, encrypted_tlv->length, subtlv);
+    uint8_t *subtlv = malloc(encrypted_tlv->length);
+    chacha20_poly1305_decrypt(CHACHA20_POLY1305_TYPE_PV03, subtlv_key, NULL, 0, (uint8_t *) &encrypted_tlv->value,
+                              encrypted_tlv->length, subtlv);
 
     tlv_decoded_item_free(encrypted_tlv);
 
-    int subtlv_length = strlen((char*)subtlv);;
-    struct tlv* ios_device_pairng_id = tlv_decode(subtlv, subtlv_length, 
-            HAP_TLV_TYPE_IDENTIFIER);
+    int subtlv_length = strlen((char *) subtlv);;
+    struct tlv *ios_device_pairng_id = tlv_decode(subtlv, subtlv_length,
+                                                  HAP_TLV_TYPE_IDENTIFIER);
     if (ios_device_pairng_id == NULL) {
         printf("tlv_decode HAP_TLV_TYPE_IDENTIFIER failed\n");
         free(subtlv);
         return pair_error(HAP_TLV_ERROR_UNKNOWN, acc_msg, acc_msg_length);
     }
 
-    struct tlv* ios_device_signature = tlv_decode(subtlv, subtlv_length, 
-            HAP_TLV_TYPE_SIGNATURE);
+    struct tlv *ios_device_signature = tlv_decode(subtlv, subtlv_length,
+                                                  HAP_TLV_TYPE_SIGNATURE);
     if (ios_device_signature == NULL) {
         printf("tlv_decode HAP_TLV_TYPE_SIGNATURE failed\n");
         free(subtlv);
@@ -180,23 +180,22 @@ static int _verify_m4(struct pair_verify* pv,
         return pair_error(HAP_TLV_ERROR_UNKNOWN, acc_msg, acc_msg_length);
     }
 
-    uint8_t* tlv_encode_ptr = *acc_msg;
+    uint8_t *tlv_encode_ptr = *acc_msg;
     tlv_encode(HAP_TLV_TYPE_STATE, sizeof(state), state, tlv_encode_ptr);
 
     return 0;
 }
 
-int pair_verify_do(void* _pv, const char* req_body, int req_body_len, char** res_body, int* res_body_len,
-        char* session_key)
-{
-    struct pair_verify* pv = _pv;
+int pair_verify_do(void *_pv, const char *req_body, int req_body_len, char **res_body, int *res_body_len,
+                   char *session_key) {
+    struct pair_verify *pv = _pv;
 
-    uint8_t state = _state_get((uint8_t*)req_body, req_body_len);
+    uint8_t state = _state_get((uint8_t *) req_body, req_body_len);
     switch (state) {
         case 0x01:
-            return _verify_m2(pv, (uint8_t*)req_body, req_body_len, (uint8_t**)res_body, res_body_len);
+            return _verify_m2(pv, (uint8_t *) req_body, req_body_len, (uint8_t **) res_body, res_body_len);
         case 0x03:
-            if (_verify_m4(pv, (uint8_t*)req_body, req_body_len, (uint8_t**)res_body, res_body_len) == 0) {
+            if (_verify_m4(pv, (uint8_t *) req_body, req_body_len, (uint8_t **) res_body, res_body_len) == 0) {
                 memcpy(session_key, pv->session_key, CURVE25519_SECRET_LENGTH);
                 return 1;
             }
@@ -207,9 +206,8 @@ int pair_verify_do(void* _pv, const char* req_body, int req_body_len, char** res
     }
 }
 
-void* pair_verify_init(char* acc_id, void* iosdevices, uint8_t* public_key, uint8_t* private_key)
-{
-    struct pair_verify* pv = calloc(1, sizeof(struct pair_verify));
+void *pair_verify_init(char *acc_id, void *iosdevices, uint8_t *public_key, uint8_t *private_key) {
+    struct pair_verify *pv = calloc(1, sizeof(struct pair_verify));
     if (pv == NULL) {
         return NULL;
     }
@@ -222,9 +220,8 @@ void* pair_verify_init(char* acc_id, void* iosdevices, uint8_t* public_key, uint
     return pv;
 }
 
-void pair_verify_cleanup(void* _pv)
-{
-    struct pair_verify* pv = _pv;
+void pair_verify_cleanup(void *_pv) {
+    struct pair_verify *pv = _pv;
 
     free(pv);
 }
