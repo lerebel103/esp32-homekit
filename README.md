@@ -1,7 +1,7 @@
 # esp32-homekit
 
 # What does this do?
-Brings Apple Homekit Accessory Protocol(HAP) to ESP32.\
+Brings Apple Homekit Accessory Protocol(HAP) to ESP32.
 Please see https://github.com/younghyunjo/esp32-homekit.git for original repo.
 
 This fork has significantly diverged in order to extend functionality:
