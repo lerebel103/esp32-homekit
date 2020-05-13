@@ -5,7 +5,6 @@
 #include <esp_log.h>
 
 #include "chacha20_poly1305.h"
-#include "concat.h"
 #include "curve25519.h"
 #include "ed25519.h"
 #include "hap_internal.h"
@@ -70,11 +69,11 @@ static int _verify_m2(struct pair_verify *pv,
         return -1;
     }
 
-    int acc_info_len;
-    uint8_t* acc_info = concat3(acc_curve_public_key, CURVE25519_KEY_LENGTH,
-                                (uint8_t*)pv->acc_id, strlen(pv->acc_id),
-                                (uint8_t*)&ios_device_curve_key->value, ios_device_curve_key->length,
-                                &acc_info_len);
+    char *acc_info = NULL;
+    int acc_info_len = asprintf(&acc_info, "%.*s%.*s%.*s",
+                                CURVE25519_KEY_LENGTH, acc_curve_public_key,
+                                strlen(pv->acc_id), (uint8_t *) pv->acc_id,
+                                ios_device_curve_key->length, (uint8_t *) &ios_device_curve_key->value);
 
     tlv_decoded_item_free(ios_device_curve_key);
 
