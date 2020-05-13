@@ -19,9 +19,6 @@ extern "C" {
 
 #define TAG "HAP"
 
-struct events {
-    struct list_head list;
-};
 
 struct hap_accessory {
     char id[HAP_ID_LENGTH+1];
