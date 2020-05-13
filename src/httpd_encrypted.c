@@ -136,8 +136,9 @@ esp_err_t httpd_encrypted_start(httpd_handle_t *server) {
 void httpd_encrypted_stop(httpd_handle_t server) {
     ESP_LOGI(TAG, "Stopping server");
 
-    xSemaphoreTakeRecursive(s_semaphore, portMAX_DELAY);
     httpd_stop(server);
+
+    xSemaphoreTakeRecursive(s_semaphore, portMAX_DELAY);
 
     for (int i = 0; i < s_config.max_open_sockets; i++) {
         struct connection_entry_t *entry = &s_entries[i];

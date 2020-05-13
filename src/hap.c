@@ -258,7 +258,10 @@ static void _disconnect_handler(void *arg, esp_event_base_t event_base,
     UNUSED_ARG(event_id);
     UNUSED_ARG(event_data);
 
-    httpd_encrypted_stop(s_server);
+    if (s_server != NULL) {
+        httpd_encrypted_stop(s_server);
+        s_server = NULL;
+    }
 }
 
 static void _connect_handler(void *arg, esp_event_base_t event_base,
@@ -271,7 +274,6 @@ static void _connect_handler(void *arg, esp_event_base_t event_base,
     if (s_server != NULL) {
         ESP_LOGI(TAG, "HTTP server already initialised, restarting");
         _disconnect_handler(arg, event_base, event_id, event_data);
-        s_server = NULL;
     }
 
     esp_err_t ret = httpd_encrypted_start(&s_server);
