@@ -11,6 +11,7 @@
 #include "pair_error.h"
 #include "srp.h"
 #include "tlv.h"
+#include "concat.h"
 
 //#define DEBUG
 
@@ -110,11 +111,17 @@ static int _ios_device_signature_verify(void *iosdevices, uint8_t *srp_key, uint
         return -1;
     }
 
-    char *ios_device_info = NULL;
+    /*char *ios_device_info = NULL;
     int ios_device_info_len = asprintf(&ios_device_info, "%.*s%.*s%.*s",
                                        (int) sizeof(ios_devicex), ios_devicex,
                                        ios_device_pairing_id->length, (char *) &ios_device_pairing_id->value,
-                                       ios_device_ltpk->length, (char *) &ios_device_ltpk->value);
+                                       ios_device_ltpk->length, (char *) &ios_device_ltpk->value);*/
+    int ios_device_info_len = 0;
+    uint8_t* ios_device_info = concat3(ios_devicex, sizeof(ios_devicex),
+                                       (uint8_t*)&ios_device_pairing_id->value, ios_device_pairing_id->length,
+                                       (uint8_t*)&ios_device_ltpk->value, ios_device_ltpk->length,
+                                       &ios_device_info_len);
+
 
     int verified = ed25519_verify((uint8_t *) &ios_device_ltpk->value, ios_device_ltpk->length,
                                   (uint8_t *) &ios_device_signature->value, ios_device_signature->length,
@@ -139,11 +146,15 @@ _acc_m6_subtlv(uint8_t *srp_key, char *acc_id, uint8_t *acc_ltk_public, uint8_t 
     hkdf_key_get(HKDF_KEY_TYPE_PAIR_SETUP_ACCESSORY, srp_key, SRP_SESSION_KEY_LENGTH,
                  accessoryx);
 
-    char *acc_info = NULL;
+    /*char *acc_info = NULL;
     int acc_info_len = asprintf(&acc_info, "%*.s%*.s%*.s",
                                 (int)sizeof(accessoryx), accessoryx,
                                 17, (uint8_t *) acc_id,
-                                ED25519_PUBLIC_KEY_LENGTH, acc_ltk_public);
+                                ED25519_PUBLIC_KEY_LENGTH, acc_ltk_public); */
+    int acc_info_len = 0;
+    uint8_t* acc_info = concat3(accessoryx, sizeof(accessoryx),
+                                (uint8_t*)acc_id, 17,
+                                acc_ltk_public, ED25519_PUBLIC_KEY_LENGTH, &acc_info_len);
 
     int acc_signature_length = ED25519_SIGN_LENGTH;
     uint8_t acc_signature[ED25519_SIGN_LENGTH] = {0,};

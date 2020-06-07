@@ -12,6 +12,7 @@
 #include "iosdevice.h"
 #include "pair_error.h"
 #include "tlv.h"
+#include "concat.h"
 
 struct pair_verify {
     char *acc_id;
@@ -69,11 +70,16 @@ static int _verify_m2(struct pair_verify *pv,
         return -1;
     }
 
-    char *acc_info = NULL;
+    /*char *acc_info = NULL;
     int acc_info_len = asprintf(&acc_info, "%.*s%.*s%.*s",
                                 CURVE25519_KEY_LENGTH, acc_curve_public_key,
                                 strlen(pv->acc_id), (uint8_t *) pv->acc_id,
-                                ios_device_curve_key->length, (uint8_t *) &ios_device_curve_key->value);
+                                ios_device_curve_key->length, (uint8_t *) &ios_device_curve_key->value);*/
+    int acc_info_len;
+    uint8_t* acc_info = concat3(acc_curve_public_key, CURVE25519_KEY_LENGTH,
+                                (uint8_t*)pv->acc_id, strlen(pv->acc_id),
+                                (uint8_t*)&ios_device_curve_key->value, ios_device_curve_key->length,
+                                &acc_info_len);
 
     tlv_decoded_item_free(ios_device_curve_key);
 

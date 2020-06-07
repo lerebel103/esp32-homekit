@@ -1,19 +1,11 @@
 #include "httpd_encrypted.h"
-#include "pair_verify.h"
-#include "pair_setup.h"
 #include "chacha20_poly1305.h"
-#include "accessories.h"
-#include "pairings.h"
-#include <search.h>
 
-#include <esp_wifi.h>
 #include <esp_http_server.h>
 #include <esp_log.h>
-#include <esp_event_base.h>
 #include <sys/param.h>
 #include <mbedtls/base64.h>
 #include <sys/socket.h>
-#include <search.h>
 
 
 struct connection_entry_t {
